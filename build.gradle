@@ -202,6 +202,44 @@ task javadocJar(type: Jar, dependsOn: javadoc) {
 	from javadoc.destinationDir
 }
 
+task xar(type: Jar, dependsOn: jar) {
+	doFirst {
+		manifest {
+			attributes(
+					jar.manifest.getAttributes()
+			)
+		}
+	}
+	group = 'build'
+	archiveName = 'GmlGeoX.xar'
+	extension = 'xar'
+	into('geox') {
+		from jar
+		from allLibs
+		from file("$projectDir/src/main/xquery/GmlGeoX.xq")
+	}
+
+	into('') {
+		from file("$projectDir/src/packaging/expath-pkg.xml")
+		filter{ it.replaceAll('@@libVersion@@', project.version)}
+	}
+	from file("$buildDir/generated/basex.xml")
+}
+
+task ('generateBaseXPackagingFile') {
+	doLast {
+		def dependencies = allLibs.collect{c -> ('<jar>'+c.name+'</jar>')}
+
+		new File("$buildDir/generated").mkdir()
+		new File("$buildDir/generated", "basex.xml").text = """\
+			<package xmlns="http://www.basex.org/modules/pkg">
+				<jar>etf-gmlgeox-2.0.0-SNAPSHOT.jar</jar>
+				${dependencies.join(System.getProperty("line.separator"))}
+                <class>de.interactive_instruments.etf.bsxm.GmlGeoX</class>
+            </package>"""
+	}
+}
+
 artifacts {
 	archives sourcesJar
 	// archives javadocJar
@@ -227,3 +265,6 @@ task copyGmlGeoXToRepo(dependsOn: jar) {
 install {
 	dependsOn = ["sourcesJar", "copyGmlGeoXToRepo"]
 }
+
+xar.dependsOn generateBaseXPackagingFile
+xar.mustRunAfter jar
